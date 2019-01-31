@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+# pip install -r requirements.txt
+
+import argparse
+import logging
+import yaml
+from kubernetes import client, config
+from kubernetes.stream import stream
+from kubernetes.stream.ws_client import ERROR_CHANNEL
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--debug', help='Debug API stream', default = False, action = 'store_true')
+parser.add_argument('-n', '--node', help='Node to run on (if blank then any)', default = '')
+parser.add_argument('-N', '--namespace', help='Namespace to use', default = 'default')
+parser.add_argument('-i', '--image', help="Image to run 'dink' with", default = 'agilicus/dink')
+parser.add_argument('-c', '--regcred', help='Registry credentials, if private', default = '')
+
+args = parser.parse_args()
+
+template = """
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {name}
+spec:
+  nodeName: {node_name}
+  restartPolicy: Never
+  {imagePullSecrets}
+  containers:
+  - name: {name}
+    image: {image}
+    imagePullPolicy: Always
+    securityContext:
+      privileged: true
+      capabilities:
+        add: ["SYS_PTRACE", "NET_ADMIN"]
+    volumeMounts:
+    - mountPath: /var/run/dockershim.sock
+      name: crisock
+    - mountPath: /run/docker/netns
+      name: netns
+    - mountPath: /var/lib/docker
+      name: dockerlib
+    env:
+      - name: "LINES"
+        value: "{lines}"
+      - name: "COLUMNS"
+        value: "{columns}"
+      - name: "TERM"
+        value: "{term}"
+  volumes:
+  - hostPath:
+      path: /var/run/dockershim.sock
+      type: ""
+    name: crisock
+  - hostPath:
+      path: /var/run/docker/netns
+      type: ""
+    name: netns
+  - hostPath:
+      path: /var/lib/docker
+      type: ""
+    name: dockerlib
+"""
+
+def launch(name, args, api):
+    try:
+        columns, lines = os.get_terminal_size()
+    except:
+        # e.g. not a tty
+        columns = 80
+        lines = 24
+    imagePullSecrets = "imagePullSecrets:\n    - name: %s" % args.regcred if len(args.regcred) else ""
+    ym = template.format(name=name, node_name=args.node, image=args.image, lines=lines, columns=columns, term=os.getenv('TERM'), imagePullSecrets=imagePullSecrets)
+    sm = yaml.load(ym)
+    try:
+        api.create_namespaced_pod(namespace=args.namespace, body=sm)
+        while True:
+            resp = api.read_namespaced_pod(namespace=args.namespace, name=name)
+            if resp.status.phase != 'Pending':
+                break
+            time.sleep(0.1)
+    except client.rest.ApiException as e:
+        if e.status == 409:
+            # Conflict, e.g. exists, we'll use it
+            pass
+        else:
+            raise e
+    return 0
+
+def shell(args, api):
+    launch("dink-%s" % args.node, args, api)
+    rc = os.system("kubectl exec -it %s -- /bin/bash" % (name))
+    rc = (rc & 0xff00) >> 8
+    body = client.V1DeleteOptions()
+    api.delete_namespaced_pod(name=name, body=body)
+    return rc
+
+config.debug = True
+config.load_kube_config()
+api = client.CoreV1Api()
+
+if args.debug:
+    import websocket
+    kslogger = logging.getLogger('kubernetes')
+    urllogger = logging.getLogger('urllib3')
+    clientlogger = logging.getLogger('client')
+    websocketlogger = logging.getLogger('websocket')
+    console_h= logging.StreamHandler()
+    kslogger.addHandler(console_h)
+    kslogger.setLevel(logging.DEBUG)
+    clientlogger.setLevel(logging.DEBUG)
+    websocketlogger.setLevel(logging.DEBUG)
+    websocket.enableTrace(True, console_h)
+
+sys.exit(shell(args, api))
+
+sys.exit(r)

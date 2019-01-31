@@ -1,0 +1,28 @@
+---
+image: cr.agilicus.com/corp-tools/docker-compose
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://localhost:2375
+
+services:
+  - name: docker:dind
+
+stages:
+  - build
+
+build:
+  stage: build
+  script: |
+    ping -c1 -4 docker > /dev/null 2>&1 && DOCKER_HOST=tcp://docker:2375
+    echo DOCKER_HOST=$DOCKER_HOST
+    docker login -u $CI_REGISTRY_USER -p $CI_BUILD_TOKEN $CI_REGISTRY;
+    docker build -t $CI_REGISTRY/$CI_PROJECT_PATH:$CI_COMMIT_REF_NAME .
+    docker push $CI_REGISTRY/$CI_PROJECT_PATH:$CI_COMMIT_REF_NAME
+    if [ "$CI_COMMIT_REF_NAME" = "master" ];
+    then
+      echo Tag $CI_REGISTRY/$CI_PROJECT_PATH:$CI_COMMIT_REF_NAME to $CI_REGISTRY/$CI_PROJECT_PATH:latest
+      docker tag $CI_REGISTRY/$CI_PROJECT_PATH:$CI_COMMIT_REF_NAME $CI_REGISTRY/$CI_PROJECT_PATH:latest
+      docker push $CI_REGISTRY/$CI_PROJECT_PATH:latest
+    fi
+
