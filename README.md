@@ -27,3 +27,20 @@ optional arguments:
   -c REGCRED, --regcred REGCRED
                         Registry credentials, if private
 ```
+
+The most common case (for me) is to delete an image from a node
+when it is 'stale' or to check if it loaded the proper one from
+my registry.
+
+E.g.:
+
+```
+$ kubectl get nodes
+NAME                       STATUS   ROLES   AGE   VERSION
+aks-agentpool-16358131-0   Ready    agent   14d   v1.11.5
+aks-agentpool-16358131-1   Ready    agent   6d    v1.11.5
+aks-agentpool-16358131-2   Ready    agent   6d    v1.11.5
+$ ./dink -n aks-agentpool-16358131-0
+# docker ps
+ ...
+```
