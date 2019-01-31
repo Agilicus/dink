@@ -4,6 +4,9 @@
 import argparse
 import logging
 import yaml
+import sys
+import os
+import time
 from kubernetes import client, config
 from kubernetes.stream import stream
 from kubernetes.stream.ws_client import ERROR_CHANNEL
@@ -41,6 +44,8 @@ spec:
       name: netns
     - mountPath: /var/lib/docker
       name: dockerlib
+    - mountPath: /var/run/docker.sock
+      name: dockersock
     env:
       - name: "LINES"
         value: "{lines}"
@@ -61,6 +66,10 @@ spec:
       path: /var/lib/docker
       type: ""
     name: dockerlib
+  - hostPath:
+      path: /var/run/docker.sock
+      type: ""
+    name: dockersock
 """
 
 def launch(name, args, api):
@@ -89,11 +98,12 @@ def launch(name, args, api):
     return 0
 
 def shell(args, api):
-    launch("dink-%s" % args.node, args, api)
-    rc = os.system("kubectl exec -it %s -- /bin/bash" % (name))
+    name = "dink%s" % args.node
+    launch(name, args, api)
+    rc = os.system("kubectl exec -it %s -- /bin/bash" % name)
     rc = (rc & 0xff00) >> 8
     body = client.V1DeleteOptions()
-    api.delete_namespaced_pod(name=name, body=body)
+    api.delete_namespaced_pod(namespace=args.namespace, name=name, body=body)
     return rc
 
 config.debug = True
