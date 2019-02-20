@@ -46,6 +46,8 @@ spec:
       name: dockerlib
     - mountPath: /var/run/docker.sock
       name: dockersock
+    - mountPath: /var/log
+      name: varlog
     env:
       - name: "LINES"
         value: "{lines}"
@@ -70,6 +72,9 @@ spec:
       path: /var/run/docker.sock
       type: ""
     name: dockersock
+  - hostPath:
+      path: /var/log
+    name: varlog
 """
 
 def launch(name, args, api):
