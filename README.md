@@ -6,6 +6,7 @@ dink: Run a 'docker' command line inside a specific Kubernetes node.
 
 - Delete images
 - Inspect containers
+- Look at raw log output
 
 ## Usage
 
@@ -42,5 +43,6 @@ aks-agentpool-16358131-1   Ready    agent   6d    v1.11.5
 aks-agentpool-16358131-2   Ready    agent   6d    v1.11.5
 $ ./dink -n aks-agentpool-16358131-0
 # docker ps
+# ls -al /var/log/containers
  ...
 ```
